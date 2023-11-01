@@ -1,0 +1,2 @@
+loadbalancer_fqdn: kubeapi.k8srt.lab
+loadbalancer_public_ip: 52.118.150.213

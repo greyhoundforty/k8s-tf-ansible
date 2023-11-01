@@ -1,0 +1,8 @@
+modules/ansible/files/certificate_authority/generated/*
+*.tfplan
+*.tfvars
+*.terraform/**
+.terraform.lock.hcl
+*.env
+**.tfstate**
+*.vscode/
