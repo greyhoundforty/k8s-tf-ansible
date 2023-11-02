@@ -1,0 +1,9 @@
+---
+  - import_playbook: 00_ping_all_hosts.yml
+  - import_playbook: 01_prep_systems.yml
+  - import_playbook: 02_generate_certs.yml
+  - import_playbook: 03_generate_kubeconfigs.yml
+  - import_playbook: 04_controller_etcd.yml
+  - import_playbook: 05_controller_kubernetes.yml
+  - import_playbook: 06_worker_nodes.yml
+  - import_playbook: 07_check_cluster_status.yml

@@ -6,10 +6,10 @@
     - vars/cluster-vars.yml
   vars:
     - FILES_PATH: "../files"
-    - CONTROLLER_PATH: "{{ FILES_PATH }}/control_plane"
     - CA_PATH: "{{ FILES_PATH }}/certificate_authority"
     - GENERATED_PATH: "{{ CA_PATH }}/generated"
     - TEMPLATES_PATH: "../templates"
+    - BOOTSTRAP_PATH: "/root/bootstrap"
     - KUBERNETES_HOSTNAMES: "kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local"
   tasks:
     - name: "Generate Certificate Authority cert and keys"
@@ -33,6 +33,8 @@
       register: admin_client
       delegate_to: localhost
       failed_when: admin_client.rc != 0
+      changed_when: admin_client.rc == 0
+
     - name: "Template the worker node kubelet certificate signing requests"
       ansible.builtin.template:
         src: "{{ TEMPLATES_PATH }}/instance-csr.j2"
@@ -40,17 +42,21 @@
         mode: "0644"
       delegate_to: localhost
       when: inventory_hostname in groups['workers']
+      changed_when: false
+
     - name: "Generate the worker node kubelet client certificates and private keys"
       args:
         chdir: "{{ GENERATED_PATH }}"
       ansible.builtin.shell: |
         set -o pipefail
         cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=../ca-config.json \
-        -profile=kubernetes -hostname={{ inventory_hostname }},{{ ansible_default_ipv4.address }} \{{ inventory_hostname }}-csr.json | cfssljson -bare {{ inventory_hostname }}
+        -profile=kubernetes -hostname={{ inventory_hostname }},{{ ansible_default_ipv4.address }} \
+        {{ inventory_hostname }}-csr.json | cfssljson -bare {{ inventory_hostname }}
       register: kubelet_client
       delegate_to: localhost
       failed_when: kubelet_client.rc != 0
       when: inventory_hostname in groups['workers']
+      changed_when: kubelet_client.rc == 0
 
     - name: "Generate the kube-controller-manager client certificate and private key"
       args:
@@ -94,9 +100,24 @@
       ansible.builtin.shell: |
         set -o pipefail
         cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=../ca-config.json \
-        -hostname=10.96.0.1,10.96.0.10,{{ groups['workers'] | join(',') }},{{ loadbalancer_fqdn }},127.0.0.1,{{ KUBERNETES_HOSTNAMES }},{{ loadbalancer_public_ip }} -profile=kubernetes ../kubernetes-csr.json | cfssljson -bare kubernetes
+        -hostname=10.96.0.1,{{ groups['workers'] | join(',') }},\
+        {{ loadbalancer_fqdn }},127.0.0.1,{{ KUBERNETES_HOSTNAMES }},\
+        {{ loadbalancer_public_ip }} -profile=kubernetes ../kubernetes-csr.json | cfssljson -bare kubernetes
       register: kube_scheduler
       delegate_to: localhost
       failed_when: kube_scheduler.rc != 0
       changed_when: kube_scheduler.rc == 0
       when: inventory_hostname in groups['controllers']
+
+    - name: "Generate the service-account certificate and private key"
+      args:
+        chdir: "{{ GENERATED_PATH }}"
+      ansible.builtin.shell: |
+        set -o pipefail
+        cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=../ca-config.json \
+        -profile=kubernetes ../service-account-csr.json | cfssljson -bare service-account
+      register: service_account
+      delegate_to: localhost
+      failed_when: service_account.rc != 0
+      changed_when: service_account.rc == 0
+

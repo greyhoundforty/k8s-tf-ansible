@@ -1,0 +1,123 @@
+---
+- name: "Test cluster connection and install coredns"
+  gather_facts: false
+  hosts: bastion
+  tasks:
+    - name: "Install required apt packages helm on bastion host"
+      ansible.builtin.apt:
+        name: apt-transport-https
+        state: present
+      register: apt_transport_installed
+      tags:
+        - packages
+      changed_when: apt_transport_installed.changed
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Download the kubectl binary, add to path and mark as executable on bastion"
+      ansible.builtin.get_url:
+        url: https://storage.googleapis.com/kubernetes-release/release/{{ K8S_VERSION }}/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        owner: root
+        group: root
+        mode: "0755"
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Copy files to bastion for kubectl cluster interaction"
+      ansible.builtin.copy:
+        src: "{{ GENERATED_PATH }}/{{ cert_file }}"
+        dest: "{{ BOOTSTRAP_PATH }}/{{ cert_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+      loop:
+        - ca.pem
+        - admin.pem
+        - admin-key.pem
+      loop_control:
+        loop_var: cert_file
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Install kubectl on bastion host for running commands against the cluster"
+      ansible.builtin.get_url:
+        url: https://storage.googleapis.com/kubernetes-release/release/{{ K8S_VERSION }}/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        owner: root
+        group: root
+        mode: "0755"
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Set cluster in kubectl config"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl config set-cluster kubernetes-the-hard-way \
+            --certificate-authority={{ BOOTSTRAP_PATH }}/ca.pem \
+            --embed-certs=true \
+            --server=https://{{ loadbalancer_fqdn }}:6443
+      register: cluster_set
+      changed_when: false
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Set admin credentials for kubectl"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl config set-credentials admin \
+            --client-certificate={{ BOOTSTRAP_PATH }}/admin.pem \
+            --client-key={{ BOOTSTRAP_PATH }}/admin-key.pem
+      register: credentials_set
+      changed_when: false
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Set kubectl context for cluster"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl config set-context kubernetes-the-hard-way \
+            --cluster=kubernetes-the-hard-way \
+            --user=admin
+      register: context_set
+      changed_when: false
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Set kubectl to use default context for cluster"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl config use-context kubernetes-the-hard-way
+      register: context_use
+      changed_when: false
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Download helm installer script"
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: "{{ BOOTSTRAP_PATH }}/get_helm.sh"
+        mode: "0700"
+      register: helm_key
+      changed_when: helm_key is changed
+      when: inventory_hostname in groups['bastion']
+
+    - name: "Run helm installer on bastion host"
+      ansible.builtin.shell: |
+        bash "{{ BOOTSTRAP_PATH }}/get_helm.sh"
+      register: helm_install_status
+      changed_when: helm_install_status.rc != 0
+      when: inventory_hostname in groups['bastion']
+
+
+    - name: "Test kubectl cluster connection"
+      ansible.builtin.shell:
+        cmd: |
+          kubectl get nodes
+      register: kubectl_status
+      changed_when: false
+
+    - name: "Print kubectl cluster connection status"
+      ansible.builtin.debug:
+        msg: "{{ kubectl_status.stdout_lines }}"
+
+    - name: "Install coredns helm"
+      ansible.builtin.shell:
+        cmd: |
+          helm repo add coredns https://coredns.github.io/helm
+          helm repo update
+          helm --namespace=kube-system install coredns coredns/coredns --set replicas=2
+      register: coredns_status
+      changed_when: false

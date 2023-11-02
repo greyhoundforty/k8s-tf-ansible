@@ -8,10 +8,39 @@
     - CNI_VERSION: "v1.3.0"
     - CNRD_VERSION: "1.7.7"
     - K8S_VERSION: "v1.27.6"
-    - SOURCE_PATH: "../../030-certificate-authority"
     - FILES_PATH: "../files"
+    - WORKER_FILES_PATH: ".{{ FILES_PATH }}/worker_node"
+    - CA_PATH: "{{ FILES_PATH }}/certificate_authority"
+    - GENERATED_PATH: "{{ CA_PATH }}/generated"
     - TEMPLATES_PATH: "../templates"
+    - BOOTSTRAP_PATH: "/root/bootstrap"
   tasks:
+    - name: "Copy the appropriate certificates and private keys to each worker instance"
+      ansible.builtin.copy:
+        src: "{{ GENERATED_PATH }}/{{ item }}"
+        dest: "/var/lib/kubelet/{{ item }}"
+        mode: "0644"
+      with_items:
+        - "{{ inventory_hostname }}-key.pem"
+        - "{{ inventory_hostname }}.pem"
+      when: inventory_hostname in groups['workers']
+      register: copy_worker_certs
+      changed_when: copy_worker_certs.changed
+    - name: "Copy kube-proxy files to each worker instance"
+      ansible.builtin.copy:
+        src: "{{ GENERATED_PATH }}/{{ item }}"
+        dest: "/var/lib/kube-proxy/{{ item }}"
+        mode: "0644"
+      with_items:
+        - "{{ inventory_hostname }}-key.pem"
+        - "{{ inventory_hostname }}.pem"
+      when: inventory_hostname in groups['workers']
+      register: copy_worker_certs
+      changed_when: copy_worker_certs.changed
+
+# ${instance}.kubeconfig kube-proxy.kubeconfig
+# /var/lib/kube-proxy/
+
     - name: "Download CRI tarball"
       ansible.builtin.get_url:
         url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ CRI_VERSION }}/crictl-{{ CRI_VERSION }}-linux-amd64.tar.gz"

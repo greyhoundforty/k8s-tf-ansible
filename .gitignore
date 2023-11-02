@@ -6,3 +6,5 @@ modules/ansible/files/certificate_authority/generated/*
 *.env
 **.tfstate**
 *.vscode/
+*cluster-vars.yml*
+modules/ansible/inventory.ini

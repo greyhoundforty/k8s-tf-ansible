@@ -68,4 +68,6 @@ module "ansible_inventory" {
   workers                = module.worker_plane.*.instance
   loadbalancer_fqdn      = "kubeapi.${var.name}.lab"
   loadbalancer_public_ip = var.loadbalancer_public_ip
+  service_cidr = var.service_cidr
+  cluster_cidr = var.cluster_cidr
 }

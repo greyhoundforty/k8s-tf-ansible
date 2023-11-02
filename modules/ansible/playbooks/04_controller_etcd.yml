@@ -8,9 +8,10 @@
     - ETCD_URL: "https://github.com/etcd-io/etcd/releases/download"
     - ETCD_VERSION: "v3.5.10"
     - FILES_PATH: "../files"
-    - CONTROLLER_PATH: "{{ FILES_PATH }}/control_plane"
     - CA_PATH: "{{ FILES_PATH }}/certificate_authority"
+    - GENERATED_PATH: "{{ CA_PATH }}/generated"
     - TEMPLATES_PATH: "../templates"
+    - BOOTSTRAP_PATH: "/root/bootstrap"
   tasks:
     - name: "Download etcd binary"
       ansible.builtin.get_url:
@@ -39,16 +40,16 @@
       loop_control:
         loop_var: etcd_file
 
-    - name: Create etcd systemd unit file
+    - name: "Template the etcd systemd service file"
       ansible.builtin.template:
         src: "{{ TEMPLATES_PATH }}/etcd.service.j2"
         dest: /etc/systemd/system/etcd.service
         trim_blocks: true
         mode: "0644"
 
-    - name: "Copy etcd required certificates and keys"
+    - name: "Copy required certificate authority files and keys for etcd"
       ansible.builtin.copy:
-        src: "{{ SOURCE_PATH }}/{{ cert_file }}"
+        src: "{{ GENERATED_PATH }}/{{ cert_file }}"
         dest: /etc/etcd/{{ cert_file }}
         owner: root
         group: root

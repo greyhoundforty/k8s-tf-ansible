@@ -18,5 +18,14 @@ variable "vpc" {
 
 variable "existing_resource_group" {}
 variable "existing_ssh_key" {}
-variable "logging_key" {}
+# variable "logging_key" {}
 variable "loadbalancer_public_ip" {}
+
+variable "service_cidr" {
+  default = "10.96.0.0/16"
+}
+
+variable "cluster_cidr" {
+  default = "172.18.0.0/16"
+}
+
