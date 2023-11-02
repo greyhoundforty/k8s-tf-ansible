@@ -1,0 +1,5 @@
+---
+  - import_playbook: 00_ping_all_hosts.yml
+  - import_playbook: 01_prep_systems.yml
+  - import_playbook: 02_generate_certs.yml
+  - import_playbook: 03_generate_kubeconfigs.yml
