@@ -7,8 +7,8 @@
       "bridge": "cni0", 
       "ipam": {
         "type": "host-local",
-        "subnet": "{{ pod_cidr }}"
-        "gateway": "{{ pod_cidr_gateway }}",
+        "subnet": "{{ cluster_cidr }}"
+        "gateway": "{{ cluster_cidr_gateway }}",
         "routes": [
             {"dst": "0.0.0.0/0"}
         ]
